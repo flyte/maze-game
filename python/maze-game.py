@@ -31,15 +31,31 @@ class Maze:
     def __init__(self, size_x, size_y, start_x, start_y):
         self.size = (size_x, size_y)
         self.start = (start_x, start_y)
-        self.rooms = [[Room([Room.Walls.North(), Room.Walls.South()]) for x in xrange(size_x)] for y in xrange(size_y)]
+        self.rooms = [[Room([]) for x in xrange(size_x)] for y in xrange(size_y)]
     
     def get_room(self, x, y):
+        """
+        Gets the room at x, y.
+        """
         return self.rooms[y][x]
         
     def set_room(self, x, y, room):
+        """
+        Sets the room at x, y.
+        """
+        # y and x are backwards here because we index by y first, then x. It makes the maze
+        # look normal when the arrays are written/printed out.
         self.rooms[y][x] = room
         
     def set_room_binary(self, x, y, value):
+        """
+        Takes a binary number and uses bitwise AND to check for the existence of
+        walls. 0b1000 being north, 0b0100 being east, 0b0010 being south and 0b0001
+        being west.
+        Sets the specified room in the maze to contain instances of the appropriate
+        wall classes.
+        Somewhat superceded by set_rooms_nesw().
+        """
         walls = []
         
         if value & 0b1000: walls.append(Room.Walls.North())
@@ -50,6 +66,9 @@ class Maze:
         self.rooms[y][x] = Room(walls)
         
     def set_rooms_binary(self, rooms):
+        """
+        Takes a two-dimensional list and sets all rooms using the values contained therein.
+        """       
         iy = 0
         for y in rooms:
             ix = 0
@@ -59,6 +78,12 @@ class Maze:
             iy += 1
             
     def set_room_nesw(self, x, y, nesw):
+        """
+        Takes a string of letters (n, e, s, w and/or x) which depict walls north, east, south
+        and west, and the start position respectively.
+        Sets the specified room in the maze to contain instances of the appropriate
+        wall classes.
+        """
         walls = []
         nesw = nesw.lower()
         
@@ -71,6 +96,9 @@ class Maze:
         self.rooms[y][x] = Room(walls)
         
     def set_rooms_nesw(self, rooms):
+        """
+        Takes a two-dimensional list and sets all rooms using the values contained therein.
+        """
         iy = 0
         for y in rooms:
             ix = 0
@@ -81,19 +109,24 @@ class Maze:
 
 ROOM_WIDTH = 50
 ROOM_HEIGHT = 50
+MAZE_START = (4, 4)
 
-def draw_room(x, y, walls, window):
+def draw_room(maze, position, window):
+    """
+    Works out the coordinates of the four corners of the room on the screen and draws
+    walls where they should be. Draws an X in room containing the starting point.
+    """
     width = ROOM_WIDTH
     height = ROOM_HEIGHT
-    x = x*width
-    y = y*height
+    x = position[0] * width
+    y = position[1] * height
     
     tl = (x, y)
-    tr = (x+width, y)
-    bl = (x, y+height)
-    br = (x+width, y+height)
+    tr = (x + width, y)
+    bl = (x, y + height)
+    br = (x + width, y + height)
     
-    walls = [x.__class__ for x in walls]
+    walls = [x.__class__ for x in maze.get_room(position[0], position[1]).walls]
     lines = []
     
     if Room.Walls.North in walls:
@@ -104,7 +137,8 @@ def draw_room(x, y, walls, window):
         lines.append((bl,br))
     if Room.Walls.West in walls:
         lines.append((tl,bl))
-    if Room.StartPoint in walls:
+#    if Room.StartPoint in walls:
+    if position == maze.start:
         lines.append((tl,br))
         lines.append((bl,tr))
         
@@ -112,8 +146,13 @@ def draw_room(x, y, walls, window):
         pygame.draw.line(window, (255,255,255), coords[0], coords[1])
         
 def move_pos(maze, position, direction, window):
+    """
+    Checks whether you're allowed to move in that direction (walls permitting) and
+    draws a line from your position to your destination if so. Returns your new position
+    or your old one if a wall blocked your way.
+    """
     room = maze.get_room(position[0], position[1])
-    position = [x for x in position]
+    position = list(position)
     
     if direction in [x.__class__ for x in room.walls]:
         #print "You cannot move that direction for there is a wall."
@@ -151,13 +190,16 @@ def move_pos(maze, position, direction, window):
     
     
 def draw_maze(window, maze):
+    """
+    Blanks the screen and (re)draws the maze.
+    """
     window.fill((0,0,0))
     
     iy = 0
     for y in maze.rooms:
         ix = 0
         for x in y:
-            draw_room(ix, iy, x.walls, window)
+            draw_room(maze, (ix, iy), window)
             pygame.display.flip()
             #sleep(0.025)
             ix += 1
@@ -168,11 +210,8 @@ def draw_maze(window, maze):
 
 if __name__ == '__main__':
     from time import sleep
+    from random import choice
 
-    width = 10
-    height = 9
-    maze = Maze(width, height, 5, 5)
-    
     maze_rooms = [
         [ "new ", "w   ", "ne  ", "nsw ", "ns  ", "ns  ", "ns  ", "ns  ", "ns  ", "ne  " ],
         [ "ew  ", "ew  ", "w   ", "ns  ", "ns  ", "n   ", "ns  ", "ns  ", "n   ", "e   " ],
@@ -185,15 +224,21 @@ if __name__ == '__main__':
         [ "sw  ", "s   ", "s   ", "nes ", "sw  ", "ns  ", "es  ", "sw  ", "ns  ", "nes " ]
     ]
     
+    width = len(maze_rooms[0])
+    height = len(maze_rooms)
+    
+    # Set up the maze
+    maze = Maze(width, height, MAZE_START[0], MAZE_START[1])
     maze.set_rooms_nesw(maze_rooms)
     
+    # Set up pygame window
     pygame.init()
-    
     window = pygame.display.set_mode((width*ROOM_WIDTH, height*ROOM_HEIGHT))
     
+    # Draw the maze
     draw_maze(window, maze)
     
-    position = (4, 4)
+    position = MAZE_START
     
     N = Room.Walls.North
     E = Room.Walls.East
@@ -202,8 +247,7 @@ if __name__ == '__main__':
     
     directions = (N, E, S, W)
     
-    from random import choice
-    
+    # Run the maze ten times and work out how many moves it takes on average
     attempts = 10
     moves_average = 0
     for i in xrange(attempts):
